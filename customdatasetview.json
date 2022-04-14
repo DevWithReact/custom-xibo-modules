@@ -1,0 +1,7 @@
+{
+    "title": "CustomDataSetView",
+    "author": "Anton",
+    "description": "A custom dataset view",
+    "name": "customdatasetview",
+    "class": "Xibo\\Custom\\CustomDataSetView"
+  }

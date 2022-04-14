@@ -1,0 +1,7 @@
+{
+    "title": "CustomCalendar",
+    "author": "Anton",
+    "description": "A custom calendar module",
+    "name": "customcalendar",
+    "class": "Xibo\\Custom\\CustomCalendar"
+  }
