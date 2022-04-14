@@ -136,11 +136,10 @@ class CustomDataSetView extends ModuleWidget
         $useQuery = $this->getOption('useQuery');
         try {
             $pdo->connect($customHost, $customDBUser, $customDBPassword, $customDBName);
-            $randomName = 'temp'.random_int(0, 10000);
             $result = $pdo->select($customSql,[]);
             return $result;
         } catch (\PDOException $e) {
-            throw new GeneralException('Custom Database connection Faied. '.$e->getMessage());
+            throw new GeneralException('[getCustomData] Custom Database connection Faied. ['.$customSql.'], '.$e->getMessage());
         }
     }
 
@@ -155,6 +154,14 @@ class CustomDataSetView extends ModuleWidget
         try {
             $pdo->connect($customHost, $customDBUser, $customDBPassword, $customDBName);
             $randomName = 'temp'.random_int(0, 10000);
+            if (preg_match('/limit\s+(\d+)/i', $customSql) == 1) {
+                $pattern = '/limit\s+(\d+)/i';
+                $replacement = 'limit 1';
+                $customSql = preg_replace($pattern, $replacement, $customSql);
+            } else {
+                str_replace(';', '', $customSql);
+                $customSql = $customSql . ' limit 1;';
+            }
             $pdo->select('create view '.$randomName.' as '.$customSql,[]);
             $rows= $pdo->select('select COLUMN_NAME from information_schema.COLUMNS where TABLE_NAME=\''.$randomName.'\';',[]);
             $pdo->select('drop view '.$randomName, []);
@@ -168,7 +175,7 @@ class CustomDataSetView extends ModuleWidget
             }
             return $columns;
         } catch (\PDOException $e) {
-            throw new GeneralException('Custom Database connection Faied. '.$e->getMessage());
+            throw new GeneralException('[getCustomQueryColumns] Custom Database connection Faied. ['.$customSql.'] ,'.$e->getMessage());
         }
         
     }
@@ -477,7 +484,7 @@ class CustomDataSetView extends ModuleWidget
                         $this->setOption('dataSetId', 0);
                     }
                 } catch (\PDOException $e) {
-                    throw new GeneralException('Custom Database connection Faied. '.$e->getMessage());
+                    throw new GeneralException('[edit] Custom Database connection Faied. '.$e->getMessage());
                 }
             } else {
                 // Do we already have a DataSet?
@@ -522,6 +529,7 @@ class CustomDataSetView extends ModuleWidget
             // Other properties
             $this->setOption('customField', $sanitizedParams->getString('customfield'));
             $this->setOption('threshold', $sanitizedParams->getString('thresholdjson'));
+            $this->setOption('thresholdCol', $sanitizedParams->getString('thresholdCol'));
             $this->setOption('dateTimeFormat', $sanitizedParams->getString('DateTimeFormat'));
             $this->setOption('name', $sanitizedParams->getString('name'));
             $this->setUseDuration($sanitizedParams->getCheckbox('useDuration'));
@@ -548,6 +556,8 @@ class CustomDataSetView extends ModuleWidget
             $this->setRawNode('javaScript', $request->getParam('javaScript', ''));
 
             $this->setOption('backgroundColor', $sanitizedParams->getString('backgroundColor'));
+            $this->setOption('alterBackColor', $sanitizedParams->getString('alterBackColor'));
+            $this->setOption('setEvenColor', $sanitizedParams->getCheckbox('setEvenColor'));
             $this->setOption('backgroundColorHeader', $sanitizedParams->getString('backgroundColor_header'));
             $this->setOption('borderColor', $sanitizedParams->getString('borderColor'));
             $this->setOption('fontColor', $sanitizedParams->getString('fontColor'));
@@ -660,7 +670,10 @@ class CustomDataSetView extends ModuleWidget
 
         // If we have some options then add them to the end of the style sheet
         if ($this->getOption('backgroundColor') != '' && $this->getOption('templateId') == 'empty') {
-            $styleSheet .= 'table.DataSetTable tbody { background-color: ' . $this->getOption('backgroundColor') . '; }';
+            (bool)$this->getOption('setEvenColor') 
+                ? $styleSheet .= 'table.DataSetTable tbody tr:nth-child(odd) { background-color: ' . $this->getOption('backgroundColor') . '; }'
+                                .'table.DataSetTable tbody tr:nth-child(even) { background-color: ' . $this->getOption('alterBackColor') . '; }'
+                : $styleSheet .= 'table.DataSetTable tbody tr { background-color: ' . $this->getOption('backgroundColor') . '; }';
         }
         if ($this->getOption('backgroundColorHeader') != '' && $this->getOption('templateId') == 'empty') {
             $styleSheet .= 'table.DataSetTable thead { background-color: ' . $this->getOption('backgroundColorHeader') . '; }';
@@ -741,6 +754,7 @@ class CustomDataSetView extends ModuleWidget
                 function setThresholdColor(){
 
                     let initalThreshold ='.$this->getOption('threshold').';
+                    console.log(initalThreshold);
                     let keyArray=[-Infinity];
                     let isNumber = new RegExp(/^[\+\-]?\d*\.?\d+(?:[Ee][\+\-]?\d+)?$/);
 
@@ -754,9 +768,10 @@ class CustomDataSetView extends ModuleWidget
 
                     } 
 
-                    $("table.DataSetTable td").each(function(){
+                    $("table.DataSetTable td[data-head=\''.$this->getOption("thresholdCol").'\']").each(function(){
                         let cellValue = $(this).children().first().html();
                         if(isNumber.test(cellValue)){
+                            console.log("it is number");
                             let intervalIndex = getKeyIndex(keyArray, cellValue); 
                             if (intervalIndex == -1)
                                 return;
@@ -992,18 +1007,18 @@ class CustomDataSetView extends ModuleWidget
             $rowCount = 1;
             $rowCountThisPage = 1;
             $totalRows = count($dataSetResults);
-
+            
             if ($rowsPerPage > 0)
-                $totalPages = $totalRows / $rowsPerPage;
+            $totalPages = $totalRows / $rowsPerPage;
             else
-                $totalPages = 1;
-
+            $totalPages = 1;
+            
             $table = '<div id="DataSetTableContainer" totalRows="' . $totalRows . '" totalPages="' . $totalPages . '">';
-
+            
             // Parse each result and
             foreach ($dataSetResults as $row) {
                 if (($rowsPerPage > 0 && $rowCountThisPage >= $rowsPerPage) || $rowCount == 1) {
-
+                    
                     // Reset the row count on this page
                     $rowCountThisPage = 0;
 
@@ -1080,7 +1095,7 @@ class CustomDataSetView extends ModuleWidget
                         $replace =date_format($replace, trim($dataTimeFormatPattern)); 
                     }
 
-                    $table .= '<td class="DataSetColumn DataSetColumn_' . $i . '" id="column_' . ($i + 1) . '"><span class="DataSetCellSpan DataSetCellSpan_' . $rowCount . '_' . $i .'" id="span_' . $rowCount . '_' . ($i + 1) . '">' . $replace . '</span></td>';
+                    $table .= '<td data-head="'. $mapping['heading'] .'" class="DataSetColumn DataSetColumn_' . $i . '" id="column_' . ($i + 1) . '"><span class="DataSetCellSpan DataSetCellSpan_' . $rowCount . '_' . $i .'" id="span_' . $rowCount . '_' . ($i + 1) . '">' . $replace . '</span></td>';
                 }
 
                 // Process queued downloads
@@ -1159,26 +1174,33 @@ class CustomDataSetView extends ModuleWidget
             throw new NotFoundException($default);
         } else{
                 try {
-                    $dataSet = $this->dataSetFactory->getById($dataSetId);
-                    $dataSetResults = $dataSet->getData();
+                    if ($this->isCustomQuery()) {
+                        $columns = $this->getCustomQueryColumns();
+                        $dataSetResults = $this->getCustomData();
+                        foreach($columns as $column) {
+                            $optionalHtmlMessage = str_replace('['. $column->heading .']', $dataSetResults[0][$column->heading], $optionalHtmlMessage);
+                        }
+                    } else {
+                        $dataSet = $this->dataSetFactory->getById($dataSetId);
+                        $dataSetResults = $dataSet->getData();
 
-                    foreach($columnIds as $dataSetColumnId) {
-                        $column = $dataSet->getColumn($dataSetColumnId);
-                        $optionalHtmlMessage = str_replace('['. $column->heading .']', $dataSetResults[0][$column->heading], $optionalHtmlMessage);
+                        foreach($columnIds as $dataSetColumnId) {
+                            $column = $dataSet->getColumn($dataSetColumnId);
+                            $optionalHtmlMessage = str_replace('['. $column->heading .']', $dataSetResults[0][$column->heading], $optionalHtmlMessage);
+                        }
                     }
                 }
                 catch (NotFoundException $e) {
                     $this->getLog()->info(sprintf('Request failed for dataSet id=%d. Widget=%d. Due to %s', $dataSetId, $this->getWidgetId(), $e->getMessage()));
                     $this->getLog()->debug($e->getTraceAsString());
-
-                    return $this->optionalHtmlMessageOrDefault();
+                    throw new GeneralException('[optionalHtmlMessageOrDefault] Column Data not Found. '.$e->getMessage());
                 }
         }
-            return [
-                'html' => $optionalHtmlMessage,
-                'countPages' => 1,
-                'countRows' => 1
-            ];
+        return [
+            'html' => $optionalHtmlMessage,
+            'countPages' => 1,
+            'countRows' => 1
+        ];
     }
 
     /**

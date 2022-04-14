@@ -22,8 +22,10 @@
 #}
 
 <script type="text/javascript">
+
     // Runs after form opens
     function customdatasetview_form_edit_open() {
+
         if($(this).find('form').data('formStep') === 1) {
             // If data set exists, set the drop-down to that value
             var dataSetId = $(this).find('form').data().elementOptions.dataSetId;
@@ -36,6 +38,9 @@
 
             // Set override template field, using the helper ()
             formHelpers.setupCheckboxInputFields($(this), '#overrideTemplate', '.template-override-controls', '.template-selector-control');
+
+            // Set alternative background color using the helper ()
+            formHelpers.setupCheckboxInputFields($(this), '#setEvenColor', '.alter-backcolor');
 
             formHelpers.setupCheckboxInputFields($(this), '#optionalHtml', '.template-optionalhtml-controls')
             // Set clock type input field, using the helper ()
