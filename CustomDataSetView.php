@@ -529,8 +529,13 @@ class CustomDataSetView extends ModuleWidget
             // Other properties
             $this->setOption('customField', $sanitizedParams->getString('customfield'));
             $this->setOption('threshold', $sanitizedParams->getString('thresholdjson'));
-            $this->setOption('thresholdCol', $sanitizedParams->getString('thresholdCol'));
             $this->setOption('dateTimeFormat', $sanitizedParams->getString('DateTimeFormat'));
+            $this->setOption('enableCustomTrigger', $sanitizedParams->getCheckbox('enableCustomTrigger'));
+            $this->setOption('triggerDataSetId', $sanitizedParams->getString('triggerDataSetId'));
+            $this->setOption('triggerColumn', $sanitizedParams->getString('triggerColumn'));
+            $this->setOption('triggerCondition', $sanitizedParams->getString('triggerCondition'));
+            $this->setOption('triggerValue', $sanitizedParams->getString('triggerValue'));
+
             $this->setOption('name', $sanitizedParams->getString('name'));
             $this->setUseDuration($sanitizedParams->getCheckbox('useDuration'));
             $this->setDuration($sanitizedParams->getInt('duration', ['default' => $this->getDuration()]));
@@ -734,50 +739,49 @@ class CustomDataSetView extends ModuleWidget
                 'generatedOn' => Carbon::now()->format('c'),
                 'freshnessTimeout' => $this->getOption('freshnessTimeout', 0),
                 'noDataMessage' => $this->noDataMessageOrDefault('')['html'],
-                'updatesInterval' => $this->getOption('updateInterval', 30000)
+                'updatesInterval' => $this->getOption('updateInterval', 30000),
+                'enableCustomTrigger' => $this->getOption('enableCustomTrigger'),
+                'triggerDataSetId' => $this->getOption('triggerDataSetId'),
+                'triggerColumn' => $this->getOption('triggerColumn'),
+                'triggerCondition' => $this->getOption('triggerCondition'),
+                'triggerValue' => $this->getOption('triggerValue'),
+                'widgetId' => $this->getWidgetId()
             ])
             ->appendJavaScript('
-                function getKeyIndex(array, value){
-                    if(array.length == 0) {
-                        return -1; 
-                    } else if( array.length == 1) {
-                        return 1; 
-                    } else {
-                        for(let i = 0; i < array.length - 1; i++)
-                        {   
-                            if(value > array[i] && value <= array[i + 1]){
-                                return i + 1; 
+                var dsTriggerTimer = 0;
+                function setThresholdColor(){
+                    let initalThreshold ='.$this->getOption('threshold').';
+                    Object.keys(initalThreshold).reverse().forEach(function(key){
+                        console.log(initalThreshold[key].value);
+                        $("table td[data-head=\'"+ initalThreshold[key].column + "\'] span")
+                            .filter(function(index){
+                                switch(initalThreshold[key].compare)
+                             {
+                             	case "less than": 
+                                    return parseInt(this.innerHTML) < initalThreshold[key].value;
+                                case "greater than": 
+                                    return parseInt(this.innerHTML) > initalThreshold[key].value;
+                                case "equals": 
+                                    return parseInt(this.innerHTML) == initalThreshold[key].value;
+                             }
+                            })
+                            .css("color", initalThreshold[key].color)
+                    })
+                }
+                function checkCustomTrigger() {
+                    $.ajax({
+                        type: "get",
+                        url: `'.$this->urlFor('module.widget.dataset.checkCustomTrigger').'?triggerDataSetId=${options.triggerDataSetId}&triggerColumn=${options.triggerColumn}&triggerCondition=${options.triggerCondition}&triggerValue=${options.triggerValue}`,
+                    }).done(function(res) {
+                        let data = res.data;
+                        if(res.success) {
+                            if (data == "false") {
+                                if (typeof parent.previewActionTrigger == "function"){
+                                    parent.previewActionTrigger("/remove", {id: options.widgetId});
+                                    dsTriggerTimer && clearInterval(dsTriggerTimer);
+                                }
                             }
                         }
-                    }
-                }
-                function setThresholdColor(){
-
-                    let initalThreshold ='.$this->getOption('threshold').';
-                    console.log(initalThreshold);
-                    let keyArray=[-Infinity];
-                    let isNumber = new RegExp(/^[\+\-]?\d*\.?\d+(?:[Ee][\+\-]?\d+)?$/);
-
-                    if (initalThreshold) {
-                        Object.keys(initalThreshold).forEach(function(key) {
-                            keyArray.push(Number(key)); 
-                        });
-                        keyArray.sort(function(a, b){
-                            return a-b;
-                        })
-
-                    } 
-
-                    $("table.DataSetTable td[data-head=\''.$this->getOption("thresholdCol").'\']").each(function(){
-                        let cellValue = $(this).children().first().html();
-                        if(isNumber.test(cellValue)){
-                            console.log("it is number");
-                            let intervalIndex = getKeyIndex(keyArray, cellValue); 
-                            if (intervalIndex == -1)
-                                return;
-                            $(this).children().first().css("color", initalThreshold[keyArray[intervalIndex]]);
-                        }
-
                     });
                 }
                 $(document).ready(function() {
@@ -790,6 +794,12 @@ class CustomDataSetView extends ModuleWidget
                     setInterval(() => {
                         window.location.reload();
                     }, options.updatesInterval * 1000);
+                    
+                    if (options.enableCustomTrigger) {
+                        dsTriggerTimer = setInterval(() => {
+                            checkCustomTrigger();
+                        }, 2000);
+                    }
                     // Do we have a freshnessTimeout?
                     if (options.freshnessTimeout > 0) {
                         // Set up an interval to check whether or not we have exceeded our freshness
@@ -1045,7 +1055,7 @@ class CustomDataSetView extends ModuleWidget
                     $table .= '<tbody>';
                 }
 
-                $table .= '<tr class="DataSetRow DataSetRow' . (($rowCount % 2) ? 'Odd' : 'Even') .' id="row_' . $rowCount . '">';
+                $table .= '<tr class="DataSetRow DataSetRow' . (($rowCount % 2) ? 'Odd"' : 'Even"') .' id="row_' . $rowCount . '">';
 
                 // Output each cell for these results
                 $i = 0; 
@@ -1095,7 +1105,7 @@ class CustomDataSetView extends ModuleWidget
                         $replace =date_format($replace, trim($dataTimeFormatPattern)); 
                     }
 
-                    $table .= '<td data-head="'. $mapping['heading'] .'" class="DataSetColumn DataSetColumn_' . $i . '" id="column_' . ($i + 1) . '"><span class="DataSetCellSpan DataSetCellSpan_' . $rowCount . '_' . $i .'" id="span_' . $rowCount . '_' . ($i + 1) . '">' . $replace . '</span></td>';
+                    $table .= '<td data-head="'.$mapping['heading'].'" class="DataSetColumn DataSetColumn_' . $i . '" id="column_' . ($i + 1) . '"><span class="DataSetCellSpan DataSetCellSpan_' . $rowCount . '_' . $i .'" id="span_' . $rowCount . '_' . ($i + 1) . '">' . $replace . '</span></td>';
                 }
 
                 // Process queued downloads

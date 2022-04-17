@@ -32,6 +32,22 @@
 {% block extra %}{{ module.getExtra()|json_encode|raw }}{% endblock %}
 
 {% block formHtml %}
+    <style>
+        .threshold-item > div:not(:last-child){
+            padding-right:0 !important; 
+            padding-left:0 !important;
+         }
+
+         .threshold-item select{
+            padding-right:0; 
+            padding-left:0;
+         }
+
+         .threshold-item > div:not(:last-child) input{
+            padding-right:0; 
+            padding-left:0;
+         }
+    </style>
     <div class="row">
         <ul class="nav nav-tabs" role="tablist">
             <li class="nav-item"><a class="nav-link active" href="#general" role="tab" data-toggle="tab"><span>{% trans "General" %}</span></a></li>
@@ -87,6 +103,45 @@
                             { id: "Inherit", value: inheritOption }
                         ] %}
                         {{ forms.dropdown("enableStat", "single", title, module.getOption("enableStat", theme.getSetting("WIDGET_STATS_ENABLED_DEFAULT")), options, "id", "value", helpText) }}
+
+                        {% set message %}{% trans "Below you can set the custom trigger options." %}{% endset %}
+                        {{ forms.message(message) }}
+
+                        {% set title %}{% trans "Use Custom Trigger?" %}{% endset %}
+                        {% set helpText %}{% trans "The custom trigger option will be enabled." %}{% endset %}
+                        {{ forms.checkbox("enableCustomTrigger", title, module.getOption("enableCustomTrigger"), helpText) }}
+
+                        {% set title %}{% trans "Trigger DataSet" %}{% endset %}
+                        {% set helpText %}{% trans "Please select the DataSet to use as a source of data for this view." %}{% endset %}
+                        {% set attributes = [
+                            { name: "data-width", value: "200px" },
+                            { name: "data-allow-clear", value: "true" },
+                            { name: "data-placeholder--id", value: null },
+                            { name: "data-placeholder--value", value: "" },
+                            { name: "data-search-url", value: url_for("module.widget.dataset.search") },
+                            { name: "data-search-term", value: "dataSet" },
+                            { name: "data-id-property", value: "dataSetId" },
+                            { name: "data-text-property", value: "dataSet" }
+                        ] %}
+                        {{ forms.dropdown("triggerDataSetId", "single", title, "", module.getDataSet(), "dataSetId", "dataSet", helpText, "dataset-fields pagedSelect", "", "", "", attributes) }}
+
+                        {% set title %}{% trans "Trigger Column" %}{% endset %}
+                        {% set options = [
+                        ] %}
+                        {{ forms.dropdown("triggerColumn", "single", title, module.getOption("triggerColumn"), options, "id", "value", helpText) }}
+
+                        {% set title %}{% trans "Trigger Condition" %}{% endset %}
+                        {% set options = [
+                            { id: "equal", value: 'equal' },
+                            { id: "greater", value: 'greater' },
+                            { id: "less", value: 'less than' }
+                        ] %}
+                        {{ forms.dropdown("triggerCondition", "single", title, module.getOption("triggerCondition"), options, "id", "value", helpText) }}
+
+                        {% set title %}{% trans "Trigger when" %}{% endset %}
+                        {% set helpText %}{% trans "The widget will be hidden when the column value meets the criteria with this value." %}{% endset %}
+                        {{ forms.number("triggerValue", title, module.getOption('triggerValue'), helpText, "triggerValue") }}
+
                     </div>
 
                     <div class="tab-pane" id="configurationTab">
@@ -217,22 +272,6 @@
                             <label class="col-sm-8">Press Add button to add threshold color for dataset view.</label>
                         </div> 
 
-                        <div class="col-sm-12">
-                            <div class="form-group row">
-                                <label class="col-sm-4 control-label" for="ckeditor_snippets_select">{% trans "Snippets" %}</label>
-                                <div class="col-sm-8 ckeditor_select_container">
-                                    <select name="thresholdCol" class="ckeditor_snippets_select form-control">
-                                        {% for column in module.dataSetColumns() %}
-                                            {% if  module.getOption('thresholdCol') == column.heading %}
-                                            <option value="{{ column.heading}}" selected >{{ column.heading}}</option>
-                                            {% else %}
-                                            <option value="{{ column.heading}}">{{ column.heading }}</option>
-                                            {% endif %}
-                                        {% endfor %}                                        
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
                         <div class="content-threshold"></div>
                     </div>
 
