@@ -502,6 +502,8 @@ class CustomCalendar extends ModuleWidget
         $this->setOption('eventLabelNow', $sanitizedParams->getString('eventLabelNow'));
         $this->setOption('calendarType', $sanitizedParams->getInt('calendarType', ['default' => 1]));
         $this->setOption('skipNoData', $sanitizedParams->getCheckbox('skipNoData'));
+        $this->setOption('customDataSetId', $sanitizedParams->getString('customDataSetId'));
+        $this->setOption('useDataSet', $sanitizedParams->getCheckbox('useDataSet'));
         
 
         $this->setOption('useiCal', $sanitizedParams->getCheckbox('useiCal'));
@@ -556,7 +558,7 @@ class CustomCalendar extends ModuleWidget
         $this->setOption('multiDayEventTextColor', $sanitizedParams->getString('multiDayEventTextColor'));
         $this->setOption('aditionalEventsBgColor', $sanitizedParams->getString('aditionalEventsBgColor'));
         $this->setOption('aditionalEventsTextColor', $sanitizedParams->getString('aditionalEventsTextColor'));
-    
+
         $this->setOption('excludeAllDay', $sanitizedParams->getCheckbox('excludeAllDay'));
         $this->setOption('updateInterval', $sanitizedParams->getInt('updateInterval', ['default' => 120]));
 
@@ -574,6 +576,22 @@ class CustomCalendar extends ModuleWidget
 
         return $response;
     }
+
+    /**
+     * Get DataSet object, used by TWIG template.
+     *
+     * @return array
+     * @throws NotFoundException
+     */
+    public function getDataSet()
+    {
+        if ($this->getOption('customDataSetId') != 0) {
+            return [$this->dataSetFactory->getById($this->getOption('customDataSetId'))];
+        } else {
+            return null;
+        }
+    }
+
 
     /**
      * @inheritdoc
@@ -660,7 +678,9 @@ class CustomCalendar extends ModuleWidget
             'aditionalEventsTextColor' => $this->getOption('aditionalEventsTextColor'),
             'noEventsBgColor' => $this->getOption('noEventsBgColor'),
             'noEventsTextColor' => $this->getOption('noEventsTextColor'),
-            'skipNoData' => $this->getOption('skipNoData')
+            'skipNoData' => $this->getOption('skipNoData'),
+            'updateInterval' => $this->getOption('updateInterval', 360),
+            'useDataSet' => $this->getOption('useDataSet')
         ];
 
         // Include some vendor items and javascript
@@ -702,10 +722,10 @@ class CustomCalendar extends ModuleWidget
                         // Parse the item and add it to the array if it has not finished yet
                         var startDate = moment(element.startDate);
                         var endDate = moment(element.endDate);
-                        
+
                         // Check if there is an event ongoing
                         ongoingEvent = (startDate.isBefore(now) && endDate.isAfter(now));
-                        
+
                         if (endDate.isAfter(now)) {
                             if (moment(element.startDate).isBefore(now)) {
                                 element.currentEvent = true;
@@ -717,21 +737,28 @@ class CustomCalendar extends ModuleWidget
                         // Return all elements
                         parsedItems.push(element);
                     });
-                
+
                     $("body").find("img").xiboImageRender(options);
                     $("body").xiboLayoutScaler(options);
-                    
+
                     var runOnVisible = function() { $("#content").xiboTextRender(options, parsedItems); };
                     (xiboIC.checkVisible()) ? runOnVisible() : xiboIC.addToQueue(runOnVisible);
 
                     // Run calendar render
                     $("body").xiboCalendarRender(options, parsedItems);
+                    
+                    console.log("noEventTrigger", items);
                     if(ongoingEvent && currentEventTrigger) {
                         // If there is an event now, send the Current Event trigger ( if exists )
                         xiboIC.trigger(currentEventTrigger);
                     } else if(noEventTrigger) {
                         // If there is no event now, send the No Event trigger
                         xiboIC.trigger(noEventTrigger);
+                    }
+                    if (options.useDataSet) {
+                        setInterval(() => {
+                            window.location.reload();
+                        }, options.updateInterval * 1000);
                     }
                 });
             ')
@@ -823,6 +850,11 @@ class CustomCalendar extends ModuleWidget
      */
     private function parseFeed($feed, $calendarType)
     {
+        $useDataSet = $this->getOption('useDataSet');
+        if ($useDataSet == 1) {
+            return $this->loadFromDataSet();
+        }
+
         $items = [];
 
         // Create an ICal helper and pass it the contents of the file.
@@ -893,6 +925,53 @@ class CustomCalendar extends ModuleWidget
                 }
 
                 $this->getLog()->debug('Event with ' . $startDt->format('c') . ' / ' . $endDt->format('c') . '. diff in days = ' . $endDt->diff($startDt)->days);
+
+                if ($excludeAllDay && ($endDt->diff($startDt)->days >= 1)) {
+                    continue;
+                }
+
+                // Create basic event element
+                $itemToAdd = [
+                    'startDate' => $startDt->format('c'),
+                    'endDate' => $endDt->format('c'),
+                    'item' => $event
+                ];
+
+                // Get event properties and add them to the resulting object
+                $itemToAdd['summary'] = $event->summary;
+                $itemToAdd['description'] = $event->description;
+                $itemToAdd['location'] = $event->location;
+
+                // Add item to array
+                $items[] = $itemToAdd;
+            } catch (\Exception $exception) {
+                $this->getLog()->error('Unable to parse event. ' . var_export($event, true));
+            }
+        }
+
+        return $items;
+    }
+
+    public function loadFromDataSet() {
+        $customDataSetId = $this->getOption('customDataSetId');
+        $dataSet = $this->dataSetFactory->getById($customDataSetId);
+        $dataSetResults = $dataSet->getData();
+
+        $items = [];
+
+        // Decide on the Range we're interested in
+        // $iCal->eventsFromInterval only works for future events
+        $excludeAllDay = $this->getOption('excludeAllDay', 0) == 1;
+
+        $startOfDay = Carbon::now()->startOfDay();
+        $endOfDay = $startOfDay->copy()->addDay()->startOfDay();
+
+        // Go through each event returned
+        foreach ($dataSetResults as $event) {
+            try {
+                $event = (object)$event;
+                $startDt = Carbon::instance(new \DateTime($event->dtstart));
+                $endDt = Carbon::instance(new \DateTime($event->dtend));
 
                 if ($excludeAllDay && ($endDt->diff($startDt)->days >= 1)) {
                     continue;

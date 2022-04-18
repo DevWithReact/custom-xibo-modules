@@ -88,6 +88,23 @@
                         </div>
                         {% set title %}{% trans "Use local calendar file" %}{% endset %}
                         {{ forms.checkbox("useiCal", title, module.getOption("useiCal")) }}
+                        
+                        {% set title %}{% trans "Import from DataSet" %}{% endset %}
+                        {% set helpText %}{% trans "Please select the DataSet to use as a source of data for this view." %}{% endset %}
+                        {% set attributes = [
+                            { name: "data-width", value: "200px" },
+                            { name: "data-allow-clear", value: "true" },
+                            { name: "data-placeholder--id", value: null },
+                            { name: "data-placeholder--value", value: "" },
+                            { name: "data-search-url", value: url_for("module.widget.dataset.search") },
+                            { name: "data-search-term", value: "dataSet" },
+                            { name: "data-id-property", value: "dataSetId" },
+                            { name: "data-text-property", value: "dataSet" }
+                        ] %}
+                        {{ forms.dropdown("customDataSetId", "single", title, "", module.getDataSet(), "dataSetId", "dataSet", helpText, "dataset-fields pagedSelect", "", "", "", attributes) }}                        
+                        {% set title %}{% trans "Import Dataset" %}{% endset %}
+                        {{ forms.checkbox("useDataSet", title, module.getOption("useDataSet")) }}
+
                         <section class="schedule-control-group">
                             {% set title %}{% trans "No events message" %}{% endset %}
                             {% set defaultMessage %}{% trans "No upcoming events" %}{% endset %}
@@ -317,9 +334,9 @@
                     </div>
 
                     <div class="tab-pane" id="cachingTab">
-                        {% set title %}{% trans "Update Interval (mins)" %}{% endset %}
-                        {% set helpText %}{% trans "Please enter the update interval in minutes. This should be kept as high as possible. For example, if the data will only change once per hour this could be set to 60." %}{% endset %}
-                        {{ forms.number("updateInterval", title, module.getOption("updateInterval", 5), helpText, "", "required") }}
+                        {% set title %}{% trans "Update Interval (secs)" %}{% endset %}
+                        {% set helpText %}{% trans "Please enter the update interval in seconds. This should be kept as high as possible. For example, if the data will only change once per hour this could be set to 3600." %}{% endset %}
+                        {{ forms.number("updateInterval", title, module.getOption("updateInterval", 300), helpText, "", "required") }}
                     </div>
 
                     <div class="tab-pane" id="optionalJavascriptTab">
