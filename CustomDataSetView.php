@@ -110,6 +110,15 @@ class CustomDataSetView extends ModuleWidget
         }
     }
 
+    public function getTriggerDataSet()
+    {
+        if ($this->getOption('triggerDataSetId') != 0) {
+            return [$this->dataSetFactory->getById($this->getOption('triggerDataSetId'))];
+        } else {
+            return null;
+        }
+    }
+
     /**
      * Get DataSet Columns
      * @return array
