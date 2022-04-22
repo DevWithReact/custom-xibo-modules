@@ -694,13 +694,31 @@ class CustomCalendar extends ModuleWidget
             ->appendCss(file_get_contents($this->getConfig()->uri('css/client.css', true)))
             ->appendOptions($calendarOptions)
             ->appendJavaScript('
-                let timer = 0;
+                var timer = 0;
+                var token = "";
+                var apiHost = "http://localhost";
+                function getAuthToken(callback) {
+                    $.ajax({
+                        type: "post",
+                        url: apiHost + "/api/authorize/access_token",
+                        data: {
+                            "client_id":"e9a1a9587fdce3f5d6c8524f0b1c56073cd5d7a3",
+                            "client_secret":"ca96e3656c33ba339820148372ee685eeea527c05115ef419c5a35e502d47fde124c1a06d70ba6a18dbe01f252a5892326d95042ffa56e32598eeed8ceffc5e454770ee71fbfaa4481b350f612cc3b018c0d642c73abab00fca0d667bf2ab98354121b3bb3900bd8b6118bf55ba79363d0e8bd9166c73e7dcc6a1c7e34bb73",
+                            "grant_type":"client_credentials",                            
+                        }
+                    }).done(function(res) {
+                        var data = res.data;
+                        token = res.access_token;
+                        callback && callback(res.access_token);
+                    });
+                }
                 function updateItems() {
                     $.ajax({
                         type: "get",
-                        url: "'.$this->urlFor('module.getCalendarItems', ['regionId' => $this->region->regionId, 'id' => $this->widget->widgetId]).'",
+                        headers: {"Authorization": "Bearer " + token},
+                        url: apiHost + "/api'.'/playlist/widget/calendar-items/'.$this->region->regionId.'/'.$this->widget->widgetId.'",
                     }).done(function(res) {
-                        let data = res.data;
+                        var data = res.data;
                         if(res.success) {
                             $("#content").html(options.mainTemplate);
                             renderCalendar(data);
@@ -766,14 +784,15 @@ class CustomCalendar extends ModuleWidget
                     }
                     if (options.useDataSet) {
                         clearInterval(timer);
-                        timer = setInterval(() => {
+                        timer = setInterval(function () {
                             updateItems();
                         }, options.updateInterval * 1000);
                     }
                 }
 
                 $(document).ready(function() {
-                    updateItems();
+                    getAuthToken(updateItems);
+                    //updateItems();
                 });
             ')
             ->appendJavaScript($this->parseLibraryReferences($this->isPreview(), $this->getRawNode('javaScript', '')))

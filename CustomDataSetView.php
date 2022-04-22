@@ -760,9 +760,26 @@ class CustomDataSetView extends ModuleWidget
                 'widgetId' => $this->getWidgetId()
             ])
             ->appendJavaScript('
-                let dsTriggerTimer = 0;
+                var dsTriggerTimer = 0;
+                var token = "";
+                var apiHost = "http://localhost";
+                function getAuthToken(callback) {
+                    $.ajax({
+                        type: "post",
+                        url: apiHost + "/api/authorize/access_token",
+                        data: {
+                            "client_id":"e9a1a9587fdce3f5d6c8524f0b1c56073cd5d7a3",
+                            "client_secret":"ca96e3656c33ba339820148372ee685eeea527c05115ef419c5a35e502d47fde124c1a06d70ba6a18dbe01f252a5892326d95042ffa56e32598eeed8ceffc5e454770ee71fbfaa4481b350f612cc3b018c0d642c73abab00fca0d667bf2ab98354121b3bb3900bd8b6118bf55ba79363d0e8bd9166c73e7dcc6a1c7e34bb73",
+                            "grant_type":"client_credentials",                            
+                        }
+                    }).done(function(res) {
+                        var data = res.data;
+                        token = res.access_token;
+                        callback && callback(res.access_token);
+                    });
+                }
                 function setThresholdColor(){
-                    let initalThreshold ='.$this->getOption('threshold').';
+                    var initalThreshold ='.$this->getOption('threshold').';
                     Object.keys(initalThreshold).reverse().forEach(function(key){
                         console.log(initalThreshold[key].value);
                         $("table td[data-head=\'"+ initalThreshold[key].column + "\'] span")
@@ -783,11 +800,12 @@ class CustomDataSetView extends ModuleWidget
                 function checkCustomTrigger() {
                     $.ajax({
                         type: "get",
-                        url: `'.$this->urlFor('module.widget.dataset.checkCustomTrigger').'?triggerDataSetId=${options.triggerDataSetId}&triggerColumn=${options.triggerColumn}&triggerCondition=${options.triggerCondition}&triggerValue=${options.triggerValue}`,
+                        url: apiHost + "/api'.'/playlist/widget/check-trigger?triggerDataSetId="+options.triggerDataSetId+"&triggerColumn="+options.triggerColumn+"&triggerCondition="+options.triggerCondition+"&triggerValue="+options.triggerValue,
+                        headers: {"Authorization": "Bearer " + token}
                     }).done(function(res) {
-                        let data = res.data;
+                        var data = res.data;
                         if(res.success) {
-                            if (data == "false") {
+                            if (data == false) {
                                 dsTriggerTimer && clearInterval(dsTriggerTimer);
                                 if (typeof parent.previewActionTrigger == "function"){
                                     parent.previewActionTrigger("/remove", {id: options.widgetId});
@@ -801,9 +819,10 @@ class CustomDataSetView extends ModuleWidget
                 function updateTableData() {
                     $.ajax({
                         type: "get",
-                        url: "'.$this->urlFor('module.getDataSetLive', ['regionId' => $this->region->regionId, 'id' => $this->widget->widgetId]).'",
+                        url: apiHost + "/api'.'/playlist/widget/dataset-live/'.$this->region->regionId.'/'.$this->widget->widgetId.'",
+                        headers: {"Authorization": "Bearer " + token}
                     }).done(function(res) {
-                        let data = res.data;
+                        var data = res.data;
                         if(res.success) {
                             $("#content").html(data.html);
                             setThresholdColor();
@@ -814,18 +833,21 @@ class CustomDataSetView extends ModuleWidget
                     $("body").xiboLayoutScaler(options);
                     $("#DataSetTableContainer").find("img").xiboImageRender(options);
 
-                    let runOnVisible = function() { $("#DataSetTableContainer").dataSetRender(options);  }; 
+                    var runOnVisible = function() { $("#DataSetTableContainer").dataSetRender(options);  }; 
                     (xiboIC.checkVisible()) ? runOnVisible() : xiboIC.addToQueue(runOnVisible);
-
-                    setInterval(() => {
-                        updateTableData();
-                    }, options.updatesInterval * 1000);
                     
-                    if (options.enableCustomTrigger === "1") {
-                        dsTriggerTimer = setInterval(() => {
-                            checkCustomTrigger();
-                        }, 2000);
-                    }
+                    getAuthToken(function() {
+                        setInterval(function() {
+                            updateTableData();
+                        }, options.updatesInterval * 1000);
+                        
+                        if (options.enableCustomTrigger === "1") {
+                            dsTriggerTimer = setInterval(function() {
+                                checkCustomTrigger();
+                            }, 2000);
+                        }
+                    });
+                    
                     // Do we have a freshnessTimeout?
                     if (options.freshnessTimeout > 0) {
                         // Set up an interval to check whether or not we have exceeded our freshness
