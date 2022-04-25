@@ -733,17 +733,7 @@ class CustomCalendar extends ModuleWidget
                     var noEventTrigger = ' . ($this->getOption('noEventTrigger', '') == '' ? 'false' : ('"' . $this->getOption('noEventTrigger') . '"')) . ';
                     var currentEventTrigger = ' . ($this->getOption('currentEventTrigger', '') == '' ? 'false' : ('"' . $this->getOption('currentEventTrigger'). '"')) . ';
                     var skipNoData = ' . $this->getOption('skipNoData') . ';
-
-                    // Close widget and skip it.
-                    if (argItems.length == 0 && skipNoData == 1) {
-                        clearInterval(timer);
-                        if (typeof parent.previewActionTrigger == "function"){
-                            parent.previewActionTrigger("/remove", {id: xiboICTargetId});
-                            return;
-                        } else {
-                            xiboIC.expireNow();
-                        }
-                    }
+                    var hasActiveEvent = false;
 
                     // Prepare the items array, sorting it and removing any items that have expired.
                     $.each(argItems, function(index, element) {
@@ -757,6 +747,7 @@ class CustomCalendar extends ModuleWidget
                         if (endDate.isAfter(now)) {
                             if (moment(element.startDate).isBefore(now)) {
                                 element.currentEvent = true;
+                                hasActiveEvent = true;
                             } else {
                                 element.currentEvent = false;
                             }
@@ -765,6 +756,17 @@ class CustomCalendar extends ModuleWidget
                         // Return all elements
                         parsedItems.push(element);
                     });
+
+                    // Close widget and skip it.
+                    if (hasActiveEvent == false && skipNoData == 1) {
+                        clearInterval(timer);
+                        if (typeof parent.previewActionTrigger == "function"){
+                            parent.previewActionTrigger("/remove", {id: xiboICTargetId});
+                            return;
+                        } else {
+                            xiboIC.expireNow();
+                        }
+                    }
 
                     $("body").find("img").xiboImageRender(options);
                     $("body").xiboLayoutScaler(options);
