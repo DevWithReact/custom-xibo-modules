@@ -757,7 +757,8 @@ class CustomDataSetView extends ModuleWidget
                 'triggerColumn' => $this->getOption('triggerColumn'),
                 'triggerCondition' => $this->getOption('triggerCondition'),
                 'triggerValue' => $this->getOption('triggerValue'),
-                'widgetId' => $this->getWidgetId()
+                'widgetId' => $this->getWidgetId(),
+                'displayId' => $displayId
             ])
             ->appendJavaScript('
                 var dsTriggerTimer = 0;
@@ -819,7 +820,7 @@ class CustomDataSetView extends ModuleWidget
                 function updateTableData() {
                     $.ajax({
                         type: "get",
-                        url: apiHost + "/api'.'/playlist/widget/dataset-live/'.$this->region->regionId.'/'.$this->widget->widgetId.'",
+                        url: apiHost + "/api'.'/playlist/widget/dataset-live/'.$this->region->regionId.'/'.$this->widget->widgetId.'/'.$displayId.'",
                         headers: {"Authorization": "Bearer " + token}
                     }).done(function(res) {
                         var data = res.data;
@@ -837,11 +838,13 @@ class CustomDataSetView extends ModuleWidget
                     (xiboIC.checkVisible()) ? runOnVisible() : xiboIC.addToQueue(runOnVisible);
                     
                     getAuthToken(function() {
+                        updateTableData();
                         setInterval(function() {
                             updateTableData();
                         }, options.updatesInterval * 1000);
                         
                         if (options.enableCustomTrigger === "1") {
+                            checkCustomTrigger();
                             dsTriggerTimer = setInterval(function() {
                                 checkCustomTrigger();
                             }, 2000);
