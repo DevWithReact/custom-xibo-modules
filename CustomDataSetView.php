@@ -764,6 +764,7 @@ class CustomDataSetView extends ModuleWidget
                 var dsTriggerTimer = 0;
                 var token = "";
                 var apiHost = "http://localhost";
+                var prevDataset = "";
                 function getAuthToken(callback) {
                     $.ajax({
                         type: "post",
@@ -825,12 +826,21 @@ class CustomDataSetView extends ModuleWidget
                     }).done(function(res) {
                         var data = res.data;
                         if(res.success) {
+                            if (data.html.trim().toLowerCase() == prevDataset.trim().toLowerCase())
+                                return;
+                            prevDataset = data.html;
+                            var currentPage = $("#DataSetTableContainer").data("cycle.opts").currSlide;
+                            var nextPage = $("#DataSetTableContainer").data("cycle.opts").nextSlide
+                            $("#DataSetTableContainer").cycle("destroy");
                             $("#content").html(data.html);
+                            $("#DataSetTableContainer").dataSetRender(options);
+                            //$("#DataSetTableContainer").cycle("goto", currentPage);
                             setThresholdColor();
                         }
                     });
                 }
                 $(document).ready(function() {
+                    prevDataset = $("#content").html();
                     $("body").xiboLayoutScaler(options);
                     $("#DataSetTableContainer").find("img").xiboImageRender(options);
 
