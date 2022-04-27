@@ -768,7 +768,7 @@ class CustomDataSetView extends ModuleWidget
                 function getAuthToken(callback) {
                     $.ajax({
                         type: "post",
-                        url: apiHost + "/api/authorize/access_token",
+                        url: apiHost + "/api/authorize/index.php/access_token",
                         data: {
                             "client_id":"e9a1a9587fdce3f5d6c8524f0b1c56073cd5d7a3",
                             "client_secret":"ca96e3656c33ba339820148372ee685eeea527c05115ef419c5a35e502d47fde124c1a06d70ba6a18dbe01f252a5892326d95042ffa56e32598eeed8ceffc5e454770ee71fbfaa4481b350f612cc3b018c0d642c73abab00fca0d667bf2ab98354121b3bb3900bd8b6118bf55ba79363d0e8bd9166c73e7dcc6a1c7e34bb73",
@@ -829,8 +829,9 @@ class CustomDataSetView extends ModuleWidget
                             if (data.html.trim().toLowerCase() == prevDataset.trim().toLowerCase())
                                 return;
                             prevDataset = data.html;
-                            var currentPage = $("#DataSetTableContainer").data("cycle.opts").currSlide;
-                            var nextPage = $("#DataSetTableContainer").data("cycle.opts").nextSlide
+							var opts = $("#DataSetTableContainer").data("cycle.opts");
+                            var currentPage = opts ? opts.currSlide : -1;
+                            var nextPage = opts ? opts.nextSlide : -1;
                             $("#DataSetTableContainer").cycle("destroy");
                             $("#content").html(data.html);
                             $("#DataSetTableContainer").dataSetRender(options);
