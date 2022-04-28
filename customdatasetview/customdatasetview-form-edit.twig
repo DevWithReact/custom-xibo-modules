@@ -260,7 +260,7 @@
 
                         {% set title %}{% trans "Font Size" %}{% endset %}
                         {% set helpText %}{% trans "Set the font size" %}{% endset %}
-                        {{ _self.numberDouble("fontSize", title, module.getOption("fontSize"), "23", helpText, "template-selector-control") }}
+                        {{ _self.numberDouble("fontSize", title, module.getOption("fontSize"), module.getOption("fontSizeHeader"), helpText, "template-selector-control") }}
 
                     </div>
 
