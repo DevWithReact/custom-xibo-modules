@@ -784,7 +784,7 @@ class CustomCalendar extends ModuleWidget
                         // If there is no event now, send the No Event trigger
                         xiboIC.trigger(noEventTrigger);
                     }
-                    if (options.useDataSet) {
+                    if (options.useDataSet == "1") {
                         clearInterval(timer);
                         timer = setInterval(function () {
                             updateItems();
